@@ -12,6 +12,7 @@ SER_OBJ=$(SER_SRC:.c=.o)
 
 .PHONY:all
 all:$(TARGET)
+	$(shell chmod 777 $(TARGET))
 
 $(TARGET):$(SER_OBJ)
 	$(CXX) -o $(@) $(^) $(FLAGS)
