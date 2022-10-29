@@ -34,9 +34,7 @@ void ParsePkt(const char* buf, ssize_t len) {
 		return;
 	}
 
-if (tcp_hdr->source != 6666) {
-	return;
-}
+	int off = tcp_hdr->doff * 4;
 	printf("[TCP]: sport: %x, dport: %x\n"
 	       "seq: %d\n"
 		   "ack_seq: %d\n"
@@ -44,7 +42,7 @@ if (tcp_hdr->source != 6666) {
 		   "check: %d\n",
 		   tcp_hdr->source, tcp_hdr->dest,
 		   tcp_hdr->seq, tcp_hdr->ack_seq,
-		   tcp_hdr->doff, tcp_hdr->urg, tcp_hdr->ack,
+		   off, tcp_hdr->urg, tcp_hdr->ack,
 		   tcp_hdr->psh, tcp_hdr->rst, tcp_hdr->syn, tcp_hdr->fin, tcp_hdr->window,
 		   tcp_hdr->check);
 }
