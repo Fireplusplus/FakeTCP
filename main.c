@@ -10,8 +10,9 @@ static short s_port = 6666;
 static const char *c_ip = "127.0.0.1";
 static short c_port = 6667;
 
+
 void ServerRun(int fd) {
-	char buf[1024];
+	char buf[65535];
 	memset(buf, '\0', sizeof(buf));
 	static int msg_cnt = 0;
 
@@ -27,11 +28,13 @@ void ServerRun(int fd) {
 			printf("recvfrom done...\n");
 			break;
 		} else {
+			ParsePkt(buf, sz);
+
 			buf[sz - 1] = '\0';
-			printf("client# %s\n", buf);
+			//printf("client# [%d]%s\n", (int)sz, buf);
 
 			snprintf(buf, sizeof(buf), "msg cnt: %d\n", ++msg_cnt);
-			sz = sendto(fd, buf, strlen(buf), 0, (struct sockaddr *)&from_addr, from_size);
+			//sz = sendto(fd, buf, strlen(buf), 0, (struct sockaddr *)&from_addr, from_size);
 			if (sz < 0) {
 				perror("sendto");
 				break;
@@ -87,8 +90,9 @@ int main(int argc, char* argv[]) {
 
 	printf("run in %s mode...\n", server ? "server" : "client");
 
-	//int fd = server ? StartServer(s_ip, s_port) : StartClient(s_ip, s_port);
-	int fd = server ? StartFakeTcp(s_ip, s_port) : StartFakeTcp(c_ip, c_port);
+	// int fd = server ? StartServer(s_ip, s_port) : StartClient(s_ip, s_port);
+	// 原始套接字不需绑定端口号
+	int fd = server ? StartFakeTcp(s_ip, 0) : StartFakeTcp(c_ip, c_port);
 	if (fd < 0) {
 		return -1;
 	}

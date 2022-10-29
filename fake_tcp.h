@@ -6,6 +6,8 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
+void ParsePkt(const char* buf, ssize_t len);
+
 void SetAddr(const char *ip, short port, struct sockaddr_in*addr);
 
 int StartFakeTcp(const char *ip, short port);
