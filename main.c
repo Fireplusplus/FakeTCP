@@ -60,12 +60,11 @@ void ClientRun(int fd)
 	inet_aton(c_ip, &client_in_addr);
 	inet_aton(c_ip, &server_in_addr);
 
-	char *data = ReserveHdrSize(buf);
-
 	while (1)
 	{
 		printf("Please Enter# ");
 		fflush(stdout);
+		char *data = ReserveHdrSize(buf);
 		ssize_t _s = read(0, data, sizeof(buf) - 1 - (data - buf));
 		if (_s < 0)
 		{
