@@ -48,24 +48,26 @@ char* ReserveHdrSize(char *buf) {
 
 uint16_t GetCheckSum(char *buf, int len) {
 	uint16_t *data = (uint16_t*)buf;
-	int sz = len / 2;
+	int sz;
 	
-	if ((len & 0x01)) {
+	if (len & 0x01) {
 		buf[len] = 0;
-		sz++;
+		sz = len / 2 + 1;
+	} else {
+		sz = len / 2;
 	}
 
 	uint32_t sum = 0;
 	int i = 0;
 	while (i < sz) {
-		if ((sum & 0xffff0000) != 0) {
-			sum = (sum & 0xffff0000) + ((sum & 0x0000ffff));
+		if (sum & 0xffff0000) {
+			sum = (sum & 0xffff0000) + (sum & 0x0000ffff);
 		} else {
 			sum += data[i++];
 		}
 	}
-	while ((sum & 0xffff0000) != 0) {
-		sum = (sum & 0xffff0000) + ((sum & 0x0000ffff));
+	while (sum & 0xffff0000) {
+		sum = (sum & 0xffff0000) + (sum & 0x0000ffff);
 	}
 
 	return ~sum;
@@ -82,10 +84,12 @@ struct check_sum_hdr {
 uint16_t GetTcpCheckSum(char *buf, int len, struct in_addr* ip_src, struct in_addr* ip_dst) {
 	struct check_sum_hdr *sum_hdr = (struct check_sum_hdr*)(buf - sizeof(struct check_sum_hdr));
 	memset(sum_hdr, 0, sizeof(struct check_sum_hdr));
+
 	memcpy(&sum_hdr->ip_src, ip_src, sizeof(struct in_addr));
 	memcpy(&sum_hdr->ip_dst, ip_dst, sizeof(struct in_addr));
 	sum_hdr->proto = IPPROTO_TCP;
 	sum_hdr->tcp_len = htons(len);
+
 	return GetCheckSum((char*)sum_hdr, len + sizeof(*sum_hdr));
 }
 
