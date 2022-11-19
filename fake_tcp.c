@@ -50,7 +50,7 @@ uint16_t GetCheckSum(char *buf, int len) {
 	uint16_t *data = (uint16_t*)buf;
 	int sz;
 	
-	if (len & 0x01) {
+	if ((len & 0x01) != 0) {
 		buf[len] = 0;
 		sz = len / 2 + 1;
 	} else {
@@ -60,14 +60,14 @@ uint16_t GetCheckSum(char *buf, int len) {
 	uint32_t sum = 0;
 	int i = 0;
 	while (i < sz) {
-		if (sum & 0xffff0000) {
-			sum = (sum & 0xffff0000) + (sum & 0x0000ffff);
+		if ((sum & 0xffff0000) != 0) {
+			sum = ((sum & 0xffff0000) >> 16) + (sum & 0x0000ffff);
 		} else {
 			sum += data[i++];
 		}
 	}
-	while (sum & 0xffff0000) {
-		sum = (sum & 0xffff0000) + (sum & 0x0000ffff);
+	while ((sum & 0xffff0000) != 0) {
+		sum = ((sum & 0xffff0000) >> 16) + (sum & 0x0000ffff);
 	}
 
 	return ~sum;

@@ -73,13 +73,14 @@ void ClientRun(int fd)
 		}
 		data[_s] = '\0';
 
-		int total = BuildPkt(data, 5/*_s*/, &client_in_addr, c_port, &server_in_addr, s_port, 0);
+		int total = BuildPkt(data, _s, &client_in_addr, c_port, &server_in_addr, s_port, 0);
 		_s = sendto(fd, buf, total, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 		if (_s < 0)
 		{
 			perror("sendto");
 			break;
 		}
+		printf("send size: %d\n", (int)_s);
 
 		/*struct sockaddr_in from_addr;
 		socklen_t from_size;
@@ -97,6 +98,7 @@ void ClientRun(int fd)
 	}
 }
 
+// TODO 伪装tcp发送握手与真实tcp建立连接
 int main(int argc, char *argv[])
 {
 	int server = 0;
