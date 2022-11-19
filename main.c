@@ -73,7 +73,7 @@ void ClientRun(int fd)
 		}
 		data[_s] = '\0';
 
-		int total = BuildPkt(data, 4/*_s*/, &client_in_addr, c_port, &server_in_addr, s_port, 0);
+		int total = BuildPkt(data, 5/*_s*/, &client_in_addr, c_port, &server_in_addr, s_port, 0);
 		_s = sendto(fd, buf, total, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 		if (_s < 0)
 		{
@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
 
 	// int fd = server ? StartServer(s_ip, s_port) : StartClient(s_ip, s_port);
 	// 原始套接字不需绑定端口号
-	int fd = server ? StartFakeTcp(s_ip, 0) : StartFakeTcp(c_ip, c_port);
+	int fd = server ? StartServer(s_ip, s_port) : StartFakeTcp(c_ip, c_port);
 	if (fd < 0)
 	{
 		return -1;

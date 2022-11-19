@@ -46,9 +46,14 @@ char* ReserveHdrSize(char *buf) {
 	return buf + size;
 }
 
-uint16_t GetCheckSum(const char *buf, int len) {
+uint16_t GetCheckSum(char *buf, int len) {
 	uint16_t *data = (uint16_t*)buf;
 	int sz = len / 2;
+	
+	if ((len & 0x01)) {
+		buf[len] = 0;
+		sz++;
+	}
 
 	uint32_t sum = 0;
 	int i = 0;
@@ -81,10 +86,10 @@ uint16_t GetTcpCheckSum(char *buf, int len, struct in_addr* ip_src, struct in_ad
 	memcpy(&sum_hdr->ip_dst, ip_dst, sizeof(struct in_addr));
 	sum_hdr->proto = IPPROTO_TCP;
 	sum_hdr->tcp_len = htons(len);
-	return GetCheckSum((const char*)sum_hdr, len + sizeof(*sum_hdr));
+	return GetCheckSum((char*)sum_hdr, len + sizeof(*sum_hdr));
 }
 
-uint16_t GetIpCheckSum(const char *buf, int len) {
+uint16_t GetIpCheckSum(char *buf, int len) {
 	return GetCheckSum(buf, len);
 }
 
@@ -132,20 +137,19 @@ const char* ParsePkt(const char* buf, ssize_t len) {
 int BuildPkt(char* data, int len,
  			 struct in_addr *ip_src, short port_src, struct in_addr *ip_dst, short port_dst,
 			 uint32_t ack_seq) {
-	if (len < 64) {
+	/*if (len < 64) {
 		memset(data + len, 0, 64 - len);
 		len = 64;
 	} else if ((len & 0x01)) {
 		memset(data + len, 0, 1);
 		len++;
-	}
+	}*/
 	struct tcphdr *tcp_hdr = (struct tcphdr*)(data - sizeof(struct tcphdr));
 	tcp_hdr->doff = sizeof(*tcp_hdr) / 4;
 	tcp_hdr->source = htons(port_src);
 	tcp_hdr->dest = htons(port_dst);
 	tcp_hdr->seq = htonl(0);
 	tcp_hdr->ack_seq = htonl(0);
-	tcp_hdr->th_sum = 0;
 	tcp_hdr->th_sum = GetTcpCheckSum((char*)tcp_hdr, sizeof(*tcp_hdr) + len, ip_src, ip_dst);
 
 	struct ip *ip_hdr = (struct ip*)(data - sizeof(struct ip) - sizeof(struct tcphdr));
@@ -158,7 +162,7 @@ int BuildPkt(char* data, int len,
 	ip_hdr->ip_ttl = 0xff;
 	ip_hdr->ip_p = IPPROTO_TCP;
 	ip_hdr->ip_id = 0;
-	ip_hdr->ip_sum = htons(GetIpCheckSum((const char*)ip_hdr, sizeof(*ip_hdr)));
+	ip_hdr->ip_sum = htons(GetIpCheckSum((char*)ip_hdr, sizeof(*ip_hdr)));
 	
 	return sizeof(struct ip) + sizeof(struct tcphdr) + len;
 }
