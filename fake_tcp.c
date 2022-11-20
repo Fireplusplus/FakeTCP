@@ -97,22 +97,15 @@ uint16_t GetIpCheckSum(char *buf, int len) {
 	return GetCheckSum(buf, len);
 }
 
-const char* ParsePkt(const char* buf, ssize_t len) {
+char* ParseIpPkt(char *buf, ssize_t len, struct pkt_info *info) {
 	struct ip *ip_hdr = (struct ip*)buf;
 	if (len < sizeof(*ip_hdr)) {
 		printf("[Invalid IP], len[%ld] < size[%ld]", len, sizeof(*ip_hdr));
-		return "";
+		return NULL;
 	}
 
 	int hdr_len = ip_hdr->ip_hl * 4;
 	int tol_len = ntohs(ip_hdr->ip_len);
-	
-	struct tcphdr *tcp_hdr = (struct tcphdr*)(buf + hdr_len);
-	if (hdr_len + sizeof(*tcp_hdr) > len) {
-		printf("[Invalid tcp], hdr_len[%d] + sizeof(*tcp_hdr)[%ld] > len[%ld]\n",
-				 hdr_len, sizeof(*tcp_hdr), len);
-		return "";
-	}
 
 	printf("[IP]: ver: %d, hdr_len: %d, tos: %d, tol_len: %d\n"
 		   "id: %d, off: %d\n"
@@ -122,11 +115,27 @@ const char* ParsePkt(const char* buf, ssize_t len) {
 		   ip_hdr->ip_id, ip_hdr->ip_off,
 		   ip_hdr->ip_ttl, ip_hdr->ip_p, ntohs(ip_hdr->ip_sum),
 		   inet_ntoa(ip_hdr->ip_src), inet_ntoa(ip_hdr->ip_dst));
+	
+	if (info) {
+		info->proto = ip_hdr->ip_p;
+		memcpy(&info->ip_src, &ip_hdr->ip_src, sizeof(info->ip_src));
+		memcpy(&info->ip_dst, &ip_hdr->ip_dst, sizeof(info->ip_dst));
+	}
+
+	return (char*)(buf + hdr_len);  // 返回传输层包头
+}
+
+char* ParseTcpPkt(char *buf, ssize_t len, struct pkt_info *info) {
+	struct tcphdr *tcp_hdr = (struct tcphdr*)(buf);
+	if (len < sizeof(*tcp_hdr)) {
+		printf("[Invalid tcp], len[%ld] < sizeof(*tcp_hdr)[%ld]\n", len, sizeof(*tcp_hdr));
+		return NULL;
+	}
 
 	int off = tcp_hdr->doff * 4;
 	printf("[TCP]: sport: %d, dport: %d\n"
-	       "seq: %d\n"
-		   "ack_seq: %d\n"
+	       "seq: %u\n"
+		   "ack_seq: %u\n"
 		   "off: %d, urg: %d, ack: %d, psh: %d, rst: %d, syn: %d, fin: %d, window: %d\n"
 		   "check: %d\n",
 		   ntohs(tcp_hdr->source), ntohs(tcp_hdr->dest),
@@ -135,40 +144,66 @@ const char* ParsePkt(const char* buf, ssize_t len) {
 		   tcp_hdr->psh, tcp_hdr->rst, tcp_hdr->syn, tcp_hdr->fin, tcp_hdr->window,
 		   tcp_hdr->check);
 
-	return (buf + hdr_len + off);
+	if (info) {
+		info->port_src = ntohs(tcp_hdr->source);
+		info->port_dst = ntohs(tcp_hdr->dest);
+		info->seq = ntohl(tcp_hdr->seq);
+		info->ack_seq = ntohl(tcp_hdr->ack_seq);
+		info->syn = tcp_hdr->syn;
+		info->ack = tcp_hdr->ack;
+		info->rst = tcp_hdr->rst;
+	}
+
+	return (char*)(buf + off);  // 返回应用层头
 }
 
-int BuildPkt(char* data, int len,
- 			 struct in_addr *ip_src, short port_src, struct in_addr *ip_dst, short port_dst,
-			 uint32_t ack_seq) {
-	/*if (len < 64) {
-		memset(data + len, 0, 64 - len);
-		len = 64;
-	} else if ((len & 0x01)) {
-		memset(data + len, 0, 1);
-		len++;
-	}*/
-	struct tcphdr *tcp_hdr = (struct tcphdr*)(data - sizeof(struct tcphdr));
-	tcp_hdr->doff = sizeof(*tcp_hdr) / 4;
-	tcp_hdr->source = htons(port_src);
-	tcp_hdr->dest = htons(port_dst);
-	tcp_hdr->seq = htonl(0);
-	tcp_hdr->ack_seq = htonl(0);
-	tcp_hdr->th_sum = GetTcpCheckSum((char*)tcp_hdr, sizeof(*tcp_hdr) + len, ip_src, ip_dst);
+char* ParsePkt(char *buf, ssize_t len, struct pkt_info *info) {
+	assert(info);
+	char *trans_hdr = ParseIpPkt(buf, len, info);
+	if (!trans_hdr) return NULL;
 
-	struct ip *ip_hdr = (struct ip*)(data - sizeof(struct ip) - sizeof(struct tcphdr));
+	if (info->proto == IPPROTO_TCP) {
+		ssize_t trans_len = len - (trans_hdr - buf);
+		char *app_layer = ParseTcpPkt(trans_hdr, trans_len, info);
+		return app_layer;
+	}
+
+	return NULL;
+}
+
+int BuildIpPkt(char* data, int len, struct in_addr *ip_src, struct in_addr *ip_dst, uint8_t proto) {
+	struct ip *ip_hdr = (struct ip*)(data - sizeof(struct ip));
+
 	memcpy(&ip_hdr->ip_src, ip_src, sizeof(*ip_src));
 	memcpy(&ip_hdr->ip_dst, ip_dst, sizeof(*ip_dst));
 	ip_hdr->ip_v = 4;
 	ip_hdr->ip_hl = sizeof(*ip_hdr) / 4;
-	ip_hdr->ip_len = htons(sizeof(*tcp_hdr) + len + sizeof(*ip_hdr));
+	ip_hdr->ip_len = htons(len + sizeof(*ip_hdr));
 	ip_hdr->ip_off = htons(0);
 	ip_hdr->ip_ttl = 0xff;
-	ip_hdr->ip_p = IPPROTO_TCP;
+	ip_hdr->ip_p = proto;
 	ip_hdr->ip_id = 0;
 	ip_hdr->ip_sum = htons(GetIpCheckSum((char*)ip_hdr, sizeof(*ip_hdr)));
 	
-	return sizeof(struct ip) + sizeof(struct tcphdr) + len;
+	return sizeof(struct ip) + len;
+}
+
+int BuildPkt(char* data, int len,
+			 struct in_addr *ip_src, short port_src,
+			 struct in_addr *ip_dst, short port_dst,
+			 uint32_t seq, uint32_t ack_seq, uint8_t syn, uint8_t ack) {
+	struct tcphdr *tcp_hdr = (struct tcphdr*)(data - sizeof(struct tcphdr));
+
+	tcp_hdr->doff = sizeof(*tcp_hdr) / 4;
+	tcp_hdr->source = htons(port_src);
+	tcp_hdr->dest = htons(port_dst);
+	tcp_hdr->seq = htonl(seq);
+	tcp_hdr->ack_seq = htonl(ack_seq);
+	if (syn) tcp_hdr->syn = 1;
+	if (ack) tcp_hdr->ack = 1;
+	tcp_hdr->th_sum = GetTcpCheckSum((char*)tcp_hdr, sizeof(*tcp_hdr) + len, ip_src, ip_dst);
+
+	return BuildIpPkt((char*)tcp_hdr, len + sizeof(struct tcphdr), ip_src, ip_dst, IPPROTO_TCP);
 }
 
 void SetAddr(const char *ip, short port, struct sockaddr_in* addr) {
@@ -260,6 +295,28 @@ int StartClient(const char *ip, short port) {
 void Stop(int fd) {
 	close(fd);
 }
+
+ssize_t recv_from_addr(int sockfd, void *buf, size_t len, int flags,
+                       struct sockaddr_in *src_addr, socklen_t *addrlen, struct pkt_info *info) {
+	assert(src_addr && addrlen);
+	uint16_t port_src = src_addr->sin_port;	
+	ssize_t sz;
+
+	do {
+		sz = recvfrom(sockfd, buf, len, flags, (struct sockaddr *)src_addr, addrlen);
+		if (sz <= 0) {
+			perror("recvfrom");
+			return sz;
+		}
+		ParsePkt(buf, sz, info);
+		if (info->port_src != port_src) {
+			continue;
+		}
+		return sz;
+	} while (1);
+	return 0;
+}
+
 
 
 

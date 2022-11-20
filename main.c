@@ -33,12 +33,12 @@ void ServerRun(int fd)
 		else
 		{
 			buf[sz - 1] = '\0';
-			const char *str = ParsePkt(buf, sz);
+			/*const char *str = ParsePkt(buf, sz);
 			if (strlen(str) == 0)
 			{
 				continue;
 			}
-			printf("client# [%ld]%s\n", strlen(str), str);
+			printf("client# [%ld]%s\n", strlen(str), str);*/
 
 			// snprintf(buf, sizeof(buf), "msg cnt: %d\n", ++msg_cnt);
 			// sz = sendto(fd, buf, strlen(buf), 0, (struct sockaddr *)&from_addr, from_size);
@@ -62,23 +62,46 @@ void ClientRun(int fd)
 
 	while (1)
 	{
-		printf("Please Enter# ");
-		fflush(stdout);
+		//printf("Please Enter# ");
+		//fflush(stdout);
 		char *data = ReserveHdrSize(buf);
-		ssize_t _s = read(0, data, sizeof(buf) - 1 - (data - buf));
+		ssize_t _s = 0;
+
+		uint32_t seq = 123;
+		uint8_t syn = 1;
+		int total = BuildPkt(data, _s, &client_in_addr, c_port, &server_in_addr, s_port, seq, 0, syn, 0);
+		_s = sendto(fd, buf, total, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+		if (_s < 0) {
+			perror("sendto");
+			break;
+		}
+
+		memset(buf, 0, sizeof(buf));
+		struct sockaddr_in from_addr;
+		from_addr.sin_port = 6666;
+		socklen_t from_size;
+		struct pkt_info info;
+		ssize_t sz = recv_from_addr(fd, buf, sizeof(buf) - 1, 0, &from_addr, &from_size, &info);
+		if (sz <= 0) {
+			perror("recvfrom");
+			break;
+		}
+		break;
+
+		/*ssize_t _s = read(0, data, sizeof(buf) - 1 - (data - buf));
 		if (_s < 0)
 		{
 			break;
 		}
 		data[_s] = '\0';
 
-		int total = BuildPkt(data, _s, &client_in_addr, c_port, &server_in_addr, s_port, 0);
+		int total = BuildPkt(data, _s, &client_in_addr, c_port, &server_in_addr, s_port, 0, 0, 0);
 		_s = sendto(fd, buf, total, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 		if (_s < 0)
 		{
 			perror("sendto");
 			break;
-		}
+		}*/
 		printf("send size: %d\n", (int)_s);
 
 		/*struct sockaddr_in from_addr;
