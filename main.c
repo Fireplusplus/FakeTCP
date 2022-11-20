@@ -50,6 +50,20 @@ void ServerRun(int fd)
 	}
 }
 
+enum conn_state {
+	tcp_closed = 0,
+	tcp_syn_sent = 1,
+	tcp_established = 2,
+};
+
+static int s_state = tcp_closed;
+/*
+22:41:23.915827 lo    In  IP 127.0.0.1.6667 > 127.0.0.1.6666: Flags [S], seq 12345, win 0, length 0
+22:41:23.915859 lo    In  IP 127.0.0.1.6666 > 127.0.0.1.6667: Flags [S.], seq 3303433406, ack 12346, win 65495, options [mss 65495], length 0
+22:41:23.915879 lo    In  IP 127.0.0.1.6667 > 127.0.0.1.6666: Flags [R], seq 12346, win 0, length 0
+
+*/
+
 void ClientRun(int fd)
 {
 	char buf[65535] = {0};
@@ -60,6 +74,10 @@ void ClientRun(int fd)
 	inet_aton(c_ip, &client_in_addr);
 	inet_aton(c_ip, &server_in_addr);
 
+	uint32_t seq = 0, ack_seq = 0;
+	uint8_t syn = 0, ack = 0;
+	struct pkt_info info;
+
 	while (1)
 	{
 		//printf("Please Enter# ");
@@ -67,9 +85,27 @@ void ClientRun(int fd)
 		char *data = ReserveHdrSize(buf);
 		ssize_t _s = 0;
 
-		uint32_t seq = 123;
-		uint8_t syn = 1;
-		int total = BuildPkt(data, _s, &client_in_addr, c_port, &server_in_addr, s_port, seq, 0, syn, 0);
+		if (s_state == tcp_closed) {
+			seq = 12345;
+			syn = 1;
+			s_state = tcp_syn_sent;
+		} else if (s_state == tcp_syn_sent) {
+			if (info.ack_seq != seq +1) {
+				printf("invalid ack_seq: %d", info.ack_seq);
+				break;
+			}
+
+			seq++;
+			syn = 0;
+			ack = 1;
+			break;  // 系统自动发了rst
+			s_state = tcp_established;
+		} else {
+			ack_seq = info.seq + info.data_len;
+			seq += _s;
+		}
+
+		int total = BuildPkt(data, _s, &client_in_addr, c_port, &server_in_addr, s_port, seq, ack_seq, syn, ack);
 		_s = sendto(fd, buf, total, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 		if (_s < 0) {
 			perror("sendto");
@@ -80,13 +116,17 @@ void ClientRun(int fd)
 		struct sockaddr_in from_addr;
 		from_addr.sin_port = 6666;
 		socklen_t from_size;
-		struct pkt_info info;
+	
 		ssize_t sz = recv_from_addr(fd, buf, sizeof(buf) - 1, 0, &from_addr, &from_size, &info);
 		if (sz <= 0) {
-			perror("recvfrom");
 			break;
 		}
-		break;
+
+		printf("s_state: %d\n", s_state);
+		if (s_state == tcp_established) {
+			break;
+		}
+
 
 		/*ssize_t _s = read(0, data, sizeof(buf) - 1 - (data - buf));
 		if (_s < 0)
@@ -102,7 +142,7 @@ void ClientRun(int fd)
 			perror("sendto");
 			break;
 		}*/
-		printf("send size: %d\n", (int)_s);
+		//printf("send size: %d\n", (int)_s);
 
 		/*struct sockaddr_in from_addr;
 		socklen_t from_size;

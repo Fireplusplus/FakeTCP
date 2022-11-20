@@ -15,6 +15,7 @@ struct pkt_info {
 	uint16_t port_dst;
 	uint32_t seq;
 	uint32_t ack_seq;
+	uint32_t data_len;
 	struct in_addr ip_src;
 	struct in_addr ip_dst;
 };

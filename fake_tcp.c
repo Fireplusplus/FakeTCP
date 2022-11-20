@@ -133,16 +133,6 @@ char* ParseTcpPkt(char *buf, ssize_t len, struct pkt_info *info) {
 	}
 
 	int off = tcp_hdr->doff * 4;
-	printf("[TCP]: sport: %d, dport: %d\n"
-	       "seq: %u\n"
-		   "ack_seq: %u\n"
-		   "off: %d, urg: %d, ack: %d, psh: %d, rst: %d, syn: %d, fin: %d, window: %d\n"
-		   "check: %d\n",
-		   ntohs(tcp_hdr->source), ntohs(tcp_hdr->dest),
-		   ntohl(tcp_hdr->seq), ntohl(tcp_hdr->ack_seq),
-		   off, tcp_hdr->urg, tcp_hdr->ack,
-		   tcp_hdr->psh, tcp_hdr->rst, tcp_hdr->syn, tcp_hdr->fin, tcp_hdr->window,
-		   tcp_hdr->check);
 
 	if (info) {
 		info->port_src = ntohs(tcp_hdr->source);
@@ -152,7 +142,19 @@ char* ParseTcpPkt(char *buf, ssize_t len, struct pkt_info *info) {
 		info->syn = tcp_hdr->syn;
 		info->ack = tcp_hdr->ack;
 		info->rst = tcp_hdr->rst;
+		info->data_len = len - off;
 	}
+
+	printf("[TCP]: sport: %d, dport: %d\n"
+	       "seq: %u\n"
+		   "ack_seq: %u\n"
+		   "off: %d, urg: %d, ack: %d, psh: %d, rst: %d, syn: %d, fin: %d, window: %d\n"
+		   "check: %d, data_len: %d\n",
+		   ntohs(tcp_hdr->source), ntohs(tcp_hdr->dest),
+		   ntohl(tcp_hdr->seq), ntohl(tcp_hdr->ack_seq),
+		   off, tcp_hdr->urg, tcp_hdr->ack,
+		   tcp_hdr->psh, tcp_hdr->rst, tcp_hdr->syn, tcp_hdr->fin, tcp_hdr->window,
+		   tcp_hdr->check, info->data_len);
 
 	return (char*)(buf + off);  // 返回应用层头
 }
@@ -310,6 +312,7 @@ ssize_t recv_from_addr(int sockfd, void *buf, size_t len, int flags,
 		}
 		ParsePkt(buf, sz, info);
 		if (info->port_src != port_src) {
+			memset(info, 0, sizeof(*info));
 			continue;
 		}
 		return sz;
