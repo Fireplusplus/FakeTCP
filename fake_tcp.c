@@ -107,6 +107,7 @@ char* ParseIpPkt(char *buf, ssize_t len, struct pkt_info *info) {
 	int hdr_len = ip_hdr->ip_hl * 4;
 	int tol_len = ntohs(ip_hdr->ip_len);
 
+	printf("================================================\n");
 	printf("[IP]: ver: %d, hdr_len: %d, tos: %d, tol_len: %d\n"
 		   "id: %d, off: %d\n"
 		   "ttl: %d, proto: %d, check_sum: 0x%x\n"

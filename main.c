@@ -57,12 +57,6 @@ enum conn_state {
 };
 
 static int s_state = tcp_closed;
-/*
-22:41:23.915827 lo    In  IP 127.0.0.1.6667 > 127.0.0.1.6666: Flags [S], seq 12345, win 0, length 0
-22:41:23.915859 lo    In  IP 127.0.0.1.6666 > 127.0.0.1.6667: Flags [S.], seq 3303433406, ack 12346, win 65495, options [mss 65495], length 0
-22:41:23.915879 lo    In  IP 127.0.0.1.6667 > 127.0.0.1.6666: Flags [R], seq 12346, win 0, length 0
-
-*/
 
 void ClientRun(int fd)
 {
@@ -80,10 +74,10 @@ void ClientRun(int fd)
 
 	while (1)
 	{
-		//printf("Please Enter# ");
-		//fflush(stdout);
 		char *data = ReserveHdrSize(buf);
 		ssize_t _s = 0;
+
+		printf("s_state: %d  ----------------------\n", s_state);
 
 		if (s_state == tcp_closed) {
 			seq = 12345;
@@ -91,14 +85,13 @@ void ClientRun(int fd)
 			s_state = tcp_syn_sent;
 		} else if (s_state == tcp_syn_sent) {
 			if (info.ack_seq != seq +1) {
-				printf("invalid ack_seq: %d", info.ack_seq);
+				printf("invalid ack_seq: %d\n", info.ack_seq);
 				break;
 			}
 
 			seq++;
 			syn = 0;
 			ack = 1;
-			break;  // 系统自动发了rst
 			s_state = tcp_established;
 		} else {
 			ack_seq = info.seq + info.data_len;
@@ -122,7 +115,6 @@ void ClientRun(int fd)
 			break;
 		}
 
-		printf("s_state: %d\n", s_state);
 		if (s_state == tcp_established) {
 			break;
 		}
@@ -160,7 +152,6 @@ void ClientRun(int fd)
 	}
 }
 
-// TODO 伪装tcp发送握手与真实tcp建立连接
 int main(int argc, char *argv[])
 {
 	int server = 0;
