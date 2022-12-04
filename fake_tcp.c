@@ -174,6 +174,7 @@ char* ParsePkt(char *buf, ssize_t len, struct pkt_info *info) {
 	return NULL;
 }
 
+// 构建IP包头
 int BuildIpPkt(char* data, int len, struct in_addr *ip_src, struct in_addr *ip_dst, uint8_t proto) {
 	struct ip *ip_hdr = (struct ip*)(data - sizeof(struct ip));
 
@@ -191,6 +192,7 @@ int BuildIpPkt(char* data, int len, struct in_addr *ip_src, struct in_addr *ip_d
 	return sizeof(struct ip) + len;
 }
 
+// 构建TCP包头
 int BuildPkt(char* data, int len,
 			 struct in_addr *ip_src, short port_src,
 			 struct in_addr *ip_dst, short port_dst,
@@ -218,12 +220,14 @@ void SetAddr(const char *ip, short port, struct sockaddr_in* addr) {
 };
 
 int StartFakeTcp(const char *ip, short port) {
+	// 打开原始套接字
 	int sock = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
 	if (sock < 0) {
 		perror("socket");
 		return -1;
 	}
 
+	// 由应用层填充IP头
 	const int on =1;
 	if (setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on)) < 0) {
 		perror("setsockopt");
